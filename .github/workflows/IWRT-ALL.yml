@@ -1,0 +1,93 @@
+name: immortalwrt-mt798x # 工作流名称：构建immortalwrt-mt798x路由器固件
+
+on:
+  push:
+    branches: [ main, master ]  # 触发条件：当代码推送到main或master分支时
+  workflow_dispatch:  # 工作流调度：允许在GitHub界面手动触发此工作流
+jobs:
+  build:
+    runs-on: ubuntu-latest  # 运行环境：使用GitHub提供的最新Ubuntu镜像
+    steps:
+   
+      # 准备编译环境
+      - name: Install dependencies and setup ccache
+        run: |
+          # 安装编译所需的依赖包
+          sudo -E apt -yqq purge firefox
+          sudo -E apt -yqq update
+          sudo -E apt -yqq full-upgrade
+          sudo -E apt -yqq autoremove --purge
+          sudo -E apt -yqq autoclean
+          sudo -E apt -yqq clean
+          sudo -E apt -yqq install dos2unix python3-netifaces libfuse-dev
+          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+          sudo -E systemctl daemon-reload
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
+          # 配置ccache环境变量
+          echo "CCACHE_DIR=${{ runner.temp }}/.ccache" >> $GITHUB_ENV
+          echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
+          ccache --max-size=2G  # 设置ccache最大大小为2GB
+          ccache -z  # 重置ccache统计信息
+          # 创建ccache目录确保权限正确
+          mkdir -p ${{ runner.temp }}/.ccache
+          chmod -R 777 ${{ runner.temp }}/.ccache
+
+        # 获取源代码
+      - name: Clone immortalwrt-mt798x #克隆源码
+        git clone --depth=1 --single-branch --branch openwrt-24.10-6.6  https://github.com/padavanonly/immortalwrt-mt798x-24.10.git immortalwrt-mt798x
+
+          
+      # 导入设备配置 
+      - name: Custom Settings 
+        run: |
+          # 检查.config文件是否存在复制.config
+          if [ -f "$GITHUB_WORKSPACE/Config/.config" ]; then
+            cat $GITHUB_WORKSPACE/Config/.config >> .config
+          else
+            echo "Error: .config file not found in Config directory!"
+            exit 1
+          fi
+
+      # 缓存加速
+      - uses: actions/cache@v4  # 使用GitHub官方的缓存动作
+
+        name: Cache ccache  # 缓存ccache
+        with:
+          path: ~/.ccache  # 缓存路径
+          key: ${{ runner.os }}-ccache-immoralwrt-${{ github.sha }}  # 缓存键名
+          restore-keys: ${{ runner.os }}-ccache-immoralwrt-  # 恢复键名前缀
+
+      # 准备构建环境
+      - name: Setup build environment  # 名称：设置编译环境
+        run: |
+          # 更新并安装所有软件源
+          ./scripts/feeds update -a  # 更新所有feeds
+          ./scripts/feeds install -a  # 安装所有feeds中的软件包
+        working-directory: ${{ github.workspace }}/immortalwrt-mt798x
+      # 验证配置
+      - name: Validate config and prepare build  # 名称：验证配置并准备编译
+        run: |
+          make defconfig  # 生成默认配置
+          make kernel_oldconfig  # 更新内核配置以匹配当前内核版本
+        working-directory: ${{ github.workspace }}/immortalwrt-mt798x
+
+      # 编译固件
+      - name: Compile firmware  # 名称：编译固件
+        run: |
+          for i in {1..3}; do  # 最多重试3次
+            make download -j$(nproc) && break  # 并行下载依赖包，成功则跳出循环
+            echo "下载尝试 $i 失败，重试中..."  # 输出重试信息
+            sleep 10  # 等待10秒后重试
+          done
+          
+          make -j$(nproc) || make -j1 V=s  # 先尝试并行编译，失败则单线程详细编译
+          ccache -s  # 显示ccache统计信息
+        working-directory: ${{ github.workspace }}/immortalwrt-mt798x
+
+      # 发布固件
+      - name: Upload artifacts  # 名称：上传构建产物
+        uses: actions/upload-artifact@v4  # 使用GitHub官方的上传产物动作
+        with:
+          name: H3C-nx30-pro-firmware  # 产物名称
+          path: immortalwrt-mt798x/bin/targets/**/*  # 要上传的文件路径
+          retention-days: 7  # 保留天数
