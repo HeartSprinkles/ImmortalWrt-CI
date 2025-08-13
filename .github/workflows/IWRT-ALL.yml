@@ -33,12 +33,12 @@ jobs:
       - name: Checkout Third-Party Code  # 检出编译源码
         uses: actions/checkout@main
         with:
-          repository: 'padavanonly/immortalwrt-mt798x-6.6'  #目标仓库
-          ref: 'openwrt-24.10-6.6'  #目标分支
-          path: 'iwrt'  #编译目录
+          repository: 'padavanonly/immortalwrt-mt798x-6.6'  # 目标仓库
+          ref: 'openwrt-24.10-6.6'  # 目标分支
+          path: 'iwrt'  # 编译目录
 
       # GitHub Ations 移除国内下载源
-      - name: Remove domestic download sources  #移除国内下载源
+      - name: Remove domestic download sources  # 移除国内下载源
         run: |
 
           PROJECT_MIRRORS_FILE="./scripts/projectsmirrors.json"
@@ -46,11 +46,29 @@ jobs:
             sed -i '/.cn\//d; /tencent/d; /aliyun/d' "$PROJECT_MIRRORS_FILE"
           fi
 
-      #获取源码提交标签
-      - name: caches
+      # 初始化变量
+      - name: Initialization Values
         run: |
-          echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
+          echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV  # 获取提交标签
+          echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ./Config/.config)" >> $GITHUB_ENV  #获取目标设备名称
+
         working-directory: ${{ github.workspace }}/iwrt
+
+      # 生成日期变量
+      - name: Generate Date Variables  # 获取日期组件
+        id: date
+        run: |
+          RELEASE_YEAR=$(date +"%y")          # 两位年份 (25)
+          RELEASE_MONTH=$(date +"%_m" | xargs) # 去前导零的月份 (8)
+          RELEASE_DAY=$(date +"%_d" | xargs)   # 去前导零的日期 (13)
+
+          # 构建标签和标题
+          RELEASE_TAG="v$RELEASE_YEAR.$RELEASE_MONTH.$RELEASE_DAY"
+          RELEASE_TITLE="Release $RELEASE_TAG"
+
+          # 注入环境变量
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+          echo "RELEASE_TITLE=$RELEASE_TITLE" >> $GITHUB_ENV
 
       # 配置 ccache 环境
       - name: Set up ccache #配置ccache环境
@@ -140,18 +158,43 @@ jobs:
           echo "=== Final ccache stats ==="
           ccache -s
 
+      # 整理生成产物预备发布
+      - name: Package Firmware
+        run: |
+          cd ./iwrt/ && mkdir ./upload/
+
+          cp -f ./.config ./upload/Config-"openwrt-24.10-6.6"-"$RELEASE_TAG".txt
+
+            echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
+            echo "WRT_LIST=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^luci-(app|theme)[^ ]*' {} \; | tr '\n' ' ')" >> $GITHUB_ENV
+
+            find ./bin/targets/ -iregex ".*\(buildinfo\|json\|sha256sums\|packages\)$" -exec rm -rf {} +
+
+            for FILE in $(find ./bin/targets/ -type f -iname "*$WRT_TARGET*") ; do
+              EXT=$(basename $FILE | cut -d '.' -f 2-)
+              NAME=$(basename $FILE | cut -d '.' -f 1 | grep -io "\($WRT_TARGET\).*")
+              NEW_FILE="openwrt-24.10-6.6"-"$NAME"-"$RELEASE_TAG"."$EXT"
+              mv -f $FILE ./upload/$NEW_FILE
+            done
+
+            find ./bin/targets/ -type f -exec mv -f {} ./upload/ \;
+
+            make clean -j$(nproc)
+          fi
+
       # 发布固件
       - name: Release Firmware  # 发布构建产物
         uses: softprops/action-gh-release@master  # 发布工作流
         with:
-          tag_name: v25.8.13
-          name: Release v25.8.13
+          tag_name: ${{ env.RELEASE_TAG }}   # 格式：v25.8.13
+          name: ${{ env.RELEASE_TITLE }}     # 格式：Release v25.8.13
           body: |
             H3C nx30pro 闭源固件
-          files: |
-            bin/targets/**/*.fip
-            bin/targets/**/*.itb
-            bin/targets/sha256sums
+            源码: padavanonly/immortalwrt-mt798x-6.6
+            分支: openwrt-24.10-6.6
+            提交: ${{env.WRT_HASH}}
+            内核版本: ${{env.WRT_KVER}}
+          files: ./iwrt/upload/*.*
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') }}
         env:
