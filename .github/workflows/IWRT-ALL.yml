@@ -85,7 +85,7 @@ jobs:
             echo "Error: .config file not found in Config directory!"
             exit 1
           fi
-          make defconfig -j$(nproc) && make clean -j$(nproc  # 生成默认配置
+          make defconfig -j$(nproc) && make clean -j$(nproc)  # 生成默认配置
         working-directory: ${{ github.workspace }}/immortalwrt-mt798x
 
         #下载依赖包
