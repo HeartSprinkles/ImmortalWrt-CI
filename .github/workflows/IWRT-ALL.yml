@@ -51,13 +51,22 @@ jobs:
             sed -i '/.cn\//d; /tencent/d; /aliyun/d' "$PROJECT_MIRRORS_FILE"
           fi
 
+        #获取源码提交标签
+      - name: caches
+        run: |
+          echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
+        working-directory: ${{ github.workspace }}/immortalwrt-mt798x
+
       # 缓存加速
-      - name: Check Caches  # 缓存ccache
-        uses: actions/cache@main  # 使用GitHub官方的缓存动作
-        with:
-          path: ~/.ccache  # 缓存路径
-          key: ${{ runner.os }}-ccache-immortalwrt-${{ github.sha }}  # 缓存键名
-          restore-keys: ${{ runner.os }}-ccache-immortalwrt-  # 恢复键名前缀
+#      - name: Check Caches  # 缓存ccache
+#        uses: actions/cache@main  # 使用GitHub官方的缓存动作
+#        with:
+#          path: |
+#            ~/.ccache  # 缓存路径
+#            ~/staging_dir/host*
+#            ~/staging_dir/tool*
+#          key: ${{ runner.os }}-ccache-immortalwrt-${{ env.WRT_HASH }}  # 缓存键名
+#          restore-keys: ${{ runner.os }}-ccache-immortalwrt-  # 恢复键名前缀
 
       # 准备构建环境
       - name: Update Feeds  # 设置编译环境
@@ -89,7 +98,6 @@ jobs:
       - name: Compile firmware  # 编译固件
         run: |
           make -j$(nproc) || make -j$(nproc) V=s  # 并行编译
-          ccache -s  # 显示ccache统计信息
         working-directory: ${{ github.workspace }}/immortalwrt-mt798x
 
       # 发布固件
