@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest  # 使用GitHub提供的最新Ubuntu镜像
     permissions:
-      contents: write  #需要这个权限来创建release
+      contents: write  # 需要这个权限来创建release
     steps:
 
 
@@ -53,7 +53,7 @@ jobs:
       - name: Initialization Values
         run: |
           echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV  # 获取提交标签
-          echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ./Config/.config)" >> $GITHUB_ENV  #获取目标设备名称
+          echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ./Config/.config)" >> $GITHUB_ENV  # 获取目标设备名称
 
         working-directory: ${{ github.workspace }}/iwrt
 
@@ -61,9 +61,9 @@ jobs:
       - name: Generate Date Variables  # 获取日期组件
         id: date
         run: |
-          RELEASE_YEAR=$(date +"%y")          # 两位年份 (25)
-          RELEASE_MONTH=$(date +"%_m" | xargs) # 去前导零的月份 (8)
-          RELEASE_DAY=$(date +"%_d" | xargs)   # 去前导零的日期 (13)
+          RELEASE_YEAR=$(date +"%y")  # 两位年份 (25)
+          RELEASE_MONTH=$(date +"%_m" | xargs)  # 去前导零的月份 (8)
+          RELEASE_DAY=$(date +"%_d" | xargs)  # 去前导零的日期 (13)
 
           # 构建标签和标题
           RELEASE_TAG="v$RELEASE_YEAR.$RELEASE_MONTH.$RELEASE_DAY"
@@ -74,7 +74,7 @@ jobs:
           echo "RELEASE_TITLE=$RELEASE_TITLE" >> $GITHUB_ENV
 
       # 配置 ccache 环境
-      - name: Set up ccache #配置ccache环境
+      - name: Set up ccache  # 配置ccache环境
         run: |
           echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
           ccache --max-size=2G
@@ -143,8 +143,8 @@ jobs:
           make defconfig -j$(nproc) && make clean -j$(nproc  # 生成默认配置
         working-directory: ${{ github.workspace }}/iwrt
 
-      #下载依赖包
-      - name: Download Packages  #下载依赖
+      # 下载依赖包
+      - name: Download Packages  # 下载依赖
         run: |
           make download -j$(nproc) && break  # 并行下载依赖包
         working-directory: ${{ github.workspace }}/iwrt
