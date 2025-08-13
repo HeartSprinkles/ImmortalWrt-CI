@@ -2,13 +2,16 @@ name: immortalwrt-mt798x # 工作流名称：构建immortalwrt-mt798x路由器�
 
 on:
   push:
-    branches: [ main, master ]  # 触发条件：当代码推送到main或master分支时
-  workflow_dispatch:  # 工作流调度：允许在GitHub界面手动触发此工作流
+    branches: [ main, master ]  # 当代码推送到main或master分支时
+  workflow_dispatch:  # 允许在GitHub界面手动触发此工作流
 jobs:
   build:
-    runs-on: ubuntu-latest  # 运行环境：使用GitHub提供的最新Ubuntu镜像
+    runs-on: ubuntu-latest  # 使用GitHub提供的最新Ubuntu镜像
     steps:
-   
+      #检入编译配置仓库
+      - name: Checkout Projects
+        uses: actions/checkout@main
+
       # 准备编译环境
       - name: Install dependencies and setup ccache
         run: |
