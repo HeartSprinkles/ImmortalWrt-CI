@@ -8,6 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest  # 使用GitHub提供的最新Ubuntu镜像
     steps:
+
       # 检出编译配置仓库
       - name: Checkout Projects
         uses: actions/checkout@main
@@ -27,22 +28,16 @@ jobs:
           sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'  # 初始化构建环境
           sudo -E systemctl daemon-reload  # 重载系统服务
           sudo -E timedatectl set-timezone "Asia/Shanghai"  # 设置时区
-          echo "CCACHE_DIR=${{ runner.temp }}/.ccache" >> $GITHUB_ENV  # 配置ccache环境变量
-          echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
-          ccache --max-size=2G  # 设置ccache最大大小为2GB
-          ccache -z  # 重置ccache统计信息
-          mkdir -p ${{ runner.temp }}/.ccache  # 创建ccache目录确保权限正确
-          chmod -R 777 ${{ runner.temp }}/.ccache
 
-        # 检出编译源码仓库
+      # 检出编译源码仓库
       - name: Checkout Third-Party Code  # 检出编译源码
         uses: actions/checkout@main
         with:
           repository: 'padavanonly/immortalwrt-mt798x-6.6'  #目标仓库
           ref: 'openwrt-24.10-6.6'  #目标分支
-          path: 'immortalwrt-mt798x'  #编译目录
+          path: 'iwrt'  #编译目录
 
-        # GitHub Ations 移除国内下载源
+      # GitHub Ations 移除国内下载源
       - name: Remove domestic download sources  #移除国内下载源
         run: |
 
@@ -51,29 +46,68 @@ jobs:
             sed -i '/.cn\//d; /tencent/d; /aliyun/d' "$PROJECT_MIRRORS_FILE"
           fi
 
-        #获取源码提交标签
+      #获取源码提交标签
       - name: caches
         run: |
           echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
-        working-directory: ${{ github.workspace }}/immortalwrt-mt798x
+        working-directory: ${{ github.workspace }}/iwrt
+
+      # 配置 ccache 环境
+      - name: Set up ccache #配置ccache环境
+        run: |
+          echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
+          ccache --max-size=2G
+          ccache -z  # 重置统计信息
+          mkdir -p ~/.ccache
+
+          # 显示初始缓存状态
+          echo "=== Initial ccache stats ==="
+          ccache -s
 
       # 缓存加速
-#      - name: Check Caches  # 缓存ccache
-#        uses: actions/cache@main  # 使用GitHub官方的缓存动作
-#        with:
-#          path: |
-#            ~/.ccache  # 缓存路径
-#            ~/staging_dir/host*
-#            ~/staging_dir/tool*
-#          key: ${{ runner.os }}-ccache-immortalwrt-${{ env.WRT_HASH }}  # 缓存键名
-#          restore-keys: ${{ runner.os }}-ccache-immortalwrt-  # 恢复键名前缀
+      - name: Check Caches  # 缓存ccache
+        id: check-cache
+        uses: actions/cache@main  # 使用GitHub官方的缓存动作
+        with:
+          path: |
+            ~/.ccache
+            ./iwrt/staging_dir/host*
+            ./iwrt/staging_dir/tool*
+          key: ${{ runner.os }}-immortalwrt-${{ env.WRT_HASH }}  # 缓存键名
+          restore-keys: ${{ runner.os }}-immortalwrt-  # 恢复键名前缀
+
+      #更新缓存
+      - name: Update Caches
+        run: |
+          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+
+          if [ -d "./iwrt/staging_dir" ]; then
+            find "./iwrt/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r DIR; do
+              find "$DIR" -type f -exec touch {} +
+            done
+
+            mkdir -p ./iwrt/tmp && echo "1" > ./iwrt/tmp/.build
+
+            echo "toolchain skiped done!"
+          else
+            echo "caches missed!"
+          fi
+
+          if ${{steps.check-cache.outputs.cache-hit != 'true'}}; then
+            CACHE_LIST=$(gh cache list --key "${{ runner.os }}-immortalwrt-" | cut -f 1)
+            for CACHE_KEY in $CACHE_LIST; do
+              gh cache delete $CACHE_KEY
+            done
+
+            echo "caches cleanup done!"
+          fi
 
       # 准备构建环境
       - name: Update Feeds  # 设置编译环境
         run: |
-          ./scripts/feeds update -a  # 更新所有feeds
+          ./scripots/feeds update -a  # 更新所有feeds
           ./scripts/feeds install -a  # 安装所有feeds中的软件包
-        working-directory: ${{ github.workspace }}/immortalwrt-mt798x
+        working-directory: ${{ github.workspace }}/iwrt
 
       # 导入并生成设备Config
       - name: Custom Settings 
@@ -86,19 +120,25 @@ jobs:
             exit 1
           fi
           make defconfig -j$(nproc) && make clean -j$(nproc  # 生成默认配置
-        working-directory: ${{ github.workspace }}/immortalwrt-mt798x
+        working-directory: ${{ github.workspace }}/iwrt
 
-        #下载依赖包
+      #下载依赖包
       - name: Download Packages  #下载依赖
         run: |
           make download -j$(nproc) && break  # 并行下载依赖包
-        working-directory: ${{ github.workspace }}/immortalwrt-mt798x
+        working-directory: ${{ github.workspace }}/iwrt
 
       # 编译固件
       - name: Compile firmware  # 编译固件
         run: |
           make -j$(nproc) || make -j$(nproc) V=s  # 并行编译
-        working-directory: ${{ github.workspace }}/immortalwrt-mt798x
+        working-directory: ${{ github.workspace }}/iwrt
+
+      # 显示缓存使用情况
+      - name: Show ccache stats
+        run: |
+          echo "=== Final ccache stats ==="
+          ccache -s
 
       # 发布固件
       - name: Release Firmware  # 发布构建产物
@@ -109,8 +149,10 @@ jobs:
           body: |
             H3C nx30pro 闭源固件
           files: |
-            immortalwrt-mt798x/bin/targets/**/*
-          draft: true
+            bin/targets/**/*.fip
+            bin/targets/**/*.itb
+            bin/targets/sha256sums
+          draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
