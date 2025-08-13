@@ -36,11 +36,11 @@ jobs:
 
         # 检出编译源码仓库
       - name: Checkout Third-Party Code  # 检出编译源码
-        uses: actions/checkout@v5
+        uses: actions/checkout@main
         with:
-          repository:'padavanonly/immortalwrt-mt798x-6.6'  #目标仓库
-          ref:'openwrt-24.10-6.6'  #目标分支
-          path:'immortalwrt-mt798x'  #编译目录
+          repository: 'padavanonly/immortalwrt-mt798x-6.6'  #目标仓库
+          ref: 'openwrt-24.10-6.6'  #目标分支
+          path: 'immortalwrt-mt798x'  #编译目录
 
         # GitHub Ations 移除国内下载源
       - name: Remove domestic download sources  #移除国内下载源
