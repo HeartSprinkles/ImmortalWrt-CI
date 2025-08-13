@@ -96,6 +96,13 @@ jobs:
       - name: Release Firmware  # 发布构建产物
         uses: softprops/action-gh-release@master  # 发布工作流
         with:
-          name: H3C-nx30-pro  # 产物名称
-          path: immortalwrt-mt798x/bin/targets/**/*  # 要上传的文件路径
-          retention-days: 7  # 保留天数
+          tag_name: v25.8.13
+          name: Release v25.8.13
+          body: |
+            H3C nx30pro 闭源固件
+          files: |
+            immortalwrt-mt798x/bin/targets/**/*
+          draft: true
+          prerelease: ${{ contains(github.ref_name, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
