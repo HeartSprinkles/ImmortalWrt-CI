@@ -126,7 +126,7 @@ jobs:
       # 准备构建环境
       - name: Update Feeds  # 设置编译环境
         run: |
-          ./scripots/feeds update -a  # 更新所有feeds
+          ./scripts/feeds update -a  # 更新所有feeds
           ./scripts/feeds install -a  # 安装所有feeds中的软件包
         working-directory: ${{ github.workspace }}/iwrt
 
