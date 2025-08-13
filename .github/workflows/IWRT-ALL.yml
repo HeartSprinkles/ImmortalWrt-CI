@@ -8,23 +8,34 @@ jobs:
   build:
     runs-on: ubuntu-latest  # 使用GitHub提供的最新Ubuntu镜像
     steps:
-      #检入编译配置仓库
+      #签出编译配置仓库
       - name: Checkout Projects
         uses: actions/checkout@main
 
       # 准备编译环境
-      - name: Install dependencies and setup ccache
+      - name: Initialization Environment
+        #设置环境变量避免安装过程中出现交互式提示
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          # 安装编译所需的依赖包
+          # 卸载 Firefox
           sudo -E apt -yqq purge firefox
+          #更新软件包列表
           sudo -E apt -yqq update
+          #全面升级系统
           sudo -E apt -yqq full-upgrade
+          #清理无用包
           sudo -E apt -yqq autoremove --purge
+          #清理本地缓存
           sudo -E apt -yqq autoclean
           sudo -E apt -yqq clean
+          #安装必要工具
           sudo -E apt -yqq install dos2unix python3-netifaces libfuse-dev
+          #初始化构建环境
           sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+          #重载系统服务
           sudo -E systemctl daemon-reload
+          #设置时区
           sudo -E timedatectl set-timezone "Asia/Shanghai"
           # 配置ccache环境变量
           echo "CCACHE_DIR=${{ runner.temp }}/.ccache" >> $GITHUB_ENV
@@ -35,11 +46,13 @@ jobs:
           mkdir -p ${{ runner.temp }}/.ccache
           chmod -R 777 ${{ runner.temp }}/.ccache
 
-        # 获取源代码
-      - name: Clone immortalwrt-mt798x #克隆源码
-        run: |
-          git clone --depth=1 --single-branch --branch openwrt-24.10-6.6  https://github.com/padavanonly/immortalwrt-mt798x-24.10.git immortalwrt-mt798x
-
+        # 签出编译源码仓库
+      - name: Checkout Third-Party Code #克隆源码
+        uses: actions/checkout@v5
+        with:
+          repository:'padavanonly/immortalwrt-mt798x-6.6'
+          ref:'openwrt-24.10-6.6'
+          path:'immortalwrt-mt798x'
           
       # 导入设备配置 
       - name: Custom Settings 
@@ -58,8 +71,8 @@ jobs:
         name: Cache ccache  # 缓存ccache
         with:
           path: ~/.ccache  # 缓存路径
-          key: ${{ runner.os }}-ccache-immoralwrt-${{ github.sha }}  # 缓存键名
-          restore-keys: ${{ runner.os }}-ccache-immoralwrt-  # 恢复键名前缀
+          key: ${{ runner.os }}-ccache-immortalwrt-${{ github.sha }}  # 缓存键名
+          restore-keys: ${{ runner.os }}-ccache-immortalwrt-  # 恢复键名前缀
 
       # 准备构建环境
       - name: Setup build environment  # 名称：设置编译环境
