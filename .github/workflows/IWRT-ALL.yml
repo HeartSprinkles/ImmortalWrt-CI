@@ -7,7 +7,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest  # 使用GitHub提供的最新Ubuntu镜像
+    permissions:
+      contents: write  #需要这个权限来创建release
     steps:
+
 
       # 检出编译配置仓库
       - name: Checkout Projects
