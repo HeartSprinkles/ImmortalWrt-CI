@@ -1,60 +1,72 @@
-name: immortalwrt-mt798x # 工作流名称：构建immortalwrt-mt798x路由器固件
+name: immortalwrt-mt798x  # CI计划
 
 on:
   push:
-    branches: [ main, master ]  # 当代码推送到main或master分支时
-  workflow_dispatch:  # 允许在GitHub界面手动触发此工作流
+    branches: [ main, master ]  # 当代码推送到main或master分支时启动工作流
+  workflow_dispatch:  # 允许手动触发此工作流
 jobs:
   build:
     runs-on: ubuntu-latest  # 使用GitHub提供的最新Ubuntu镜像
     steps:
-      #签出编译配置仓库
+      # 检出编译配置仓库
       - name: Checkout Projects
         uses: actions/checkout@main
 
       # 准备编译环境
       - name: Initialization Environment
-        #设置环境变量避免安装过程中出现交互式提示
         env:
-          DEBIAN_FRONTEND: noninteractive
+          DEBIAN_FRONTEND: noninteractive  # 设置环境变量避免安装过程中出现交互式提示
         run: |
-          # 卸载 Firefox
-          sudo -E apt -yqq purge firefox
-          #更新软件包列表
-          sudo -E apt -yqq update
-          #全面升级系统
-          sudo -E apt -yqq full-upgrade
-          #清理无用包
-          sudo -E apt -yqq autoremove --purge
-          #清理本地缓存
-          sudo -E apt -yqq autoclean
+          sudo -E apt -yqq purge firefox  # 卸载 Firefox
+          sudo -E apt -yqq update  # 更新软件包列表
+          sudo -E apt -yqq full-upgrade  # 全面升级系统
+          sudo -E apt -yqq autoremove --purge  # 清理无用包
+          sudo -E apt -yqq autoclean  # 清理本地缓存
           sudo -E apt -yqq clean
-          #安装必要工具
-          sudo -E apt -yqq install dos2unix python3-netifaces libfuse-dev
-          #初始化构建环境
-          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
-          #重载系统服务
-          sudo -E systemctl daemon-reload
-          #设置时区
-          sudo -E timedatectl set-timezone "Asia/Shanghai"
-          # 配置ccache环境变量
-          echo "CCACHE_DIR=${{ runner.temp }}/.ccache" >> $GITHUB_ENV
+          sudo -E apt -yqq install dos2unix python3-netifaces libfuse-dev  # 安装必要工具
+          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'  # 初始化构建环境
+          sudo -E systemctl daemon-reload  # 重载系统服务
+          sudo -E timedatectl set-timezone "Asia/Shanghai"  # 设置时区
+          echo "CCACHE_DIR=${{ runner.temp }}/.ccache" >> $GITHUB_ENV  # 配置ccache环境变量
           echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
           ccache --max-size=2G  # 设置ccache最大大小为2GB
           ccache -z  # 重置ccache统计信息
-          # 创建ccache目录确保权限正确
-          mkdir -p ${{ runner.temp }}/.ccache
+          mkdir -p ${{ runner.temp }}/.ccache  # 创建ccache目录确保权限正确
           chmod -R 777 ${{ runner.temp }}/.ccache
 
-        # 签出编译源码仓库
-      - name: Checkout Third-Party Code #克隆源码
+        # 检出编译源码仓库
+      - name: Checkout Third-Party Code  # 检出编译源码
         uses: actions/checkout@v5
         with:
-          repository:'padavanonly/immortalwrt-mt798x-6.6'
-          ref:'openwrt-24.10-6.6'
-          path:'immortalwrt-mt798x'
-          
-      # 导入设备配置 
+          repository:'padavanonly/immortalwrt-mt798x-6.6'  #目标仓库
+          ref:'openwrt-24.10-6.6'  #目标分支
+          path:'immortalwrt-mt798x'  #编译目录
+
+        # GitHub Ations 移除国内下载源
+      - name: Remove domestic download sources  #移除国内下载源
+        run: |
+
+          PROJECT_MIRRORS_FILE="./scripts/projectsmirrors.json"
+          if [ -f "$PROJECT_MIRRORS_FILE" ]; then
+            sed -i '/.cn\//d; /tencent/d; /aliyun/d' "$PROJECT_MIRRORS_FILE"
+          fi
+
+      # 缓存加速
+      - name: Check Caches  # 缓存ccache
+        uses: actions/cache@main  # 使用GitHub官方的缓存动作
+        with:
+          path: ~/.ccache  # 缓存路径
+          key: ${{ runner.os }}-ccache-immortalwrt-${{ github.sha }}  # 缓存键名
+          restore-keys: ${{ runner.os }}-ccache-immortalwrt-  # 恢复键名前缀
+
+      # 准备构建环境
+      - name: Update Feeds  # 设置编译环境
+        run: |
+          ./scripts/feeds update -a  # 更新所有feeds
+          ./scripts/feeds install -a  # 安装所有feeds中的软件包
+        working-directory: ${{ github.workspace }}/immortalwrt-mt798x
+
+      # 导入并生成设备Config
       - name: Custom Settings 
         run: |
           # 检查.config文件是否存在复制.config
@@ -64,47 +76,26 @@ jobs:
             echo "Error: .config file not found in Config directory!"
             exit 1
           fi
-
-      # 缓存加速
-      - uses: actions/cache@v4  # 使用GitHub官方的缓存动作
-
-        name: Cache ccache  # 缓存ccache
-        with:
-          path: ~/.ccache  # 缓存路径
-          key: ${{ runner.os }}-ccache-immortalwrt-${{ github.sha }}  # 缓存键名
-          restore-keys: ${{ runner.os }}-ccache-immortalwrt-  # 恢复键名前缀
-
-      # 准备构建环境
-      - name: Setup build environment  # 名称：设置编译环境
-        run: |
-          # 更新并安装所有软件源
-          ./scripts/feeds update -a  # 更新所有feeds
-          ./scripts/feeds install -a  # 安装所有feeds中的软件包
+          make defconfig -j$(nproc) && make clean -j$(nproc  # 生成默认配置
         working-directory: ${{ github.workspace }}/immortalwrt-mt798x
-      # 验证配置
-      - name: Validate config and prepare build  # 名称：验证配置并准备编译
+
+        #下载依赖包
+      - name: Download Packages  #下载依赖
         run: |
-          make defconfig  # 生成默认配置
-          make kernel_oldconfig  # 更新内核配置以匹配当前内核版本
+          make download -j$(nproc) && break  # 并行下载依赖包
         working-directory: ${{ github.workspace }}/immortalwrt-mt798x
 
       # 编译固件
-      - name: Compile firmware  # 名称：编译固件
+      - name: Compile firmware  # 编译固件
         run: |
-          for i in {1..3}; do  # 最多重试3次
-            make download -j$(nproc) && break  # 并行下载依赖包，成功则跳出循环
-            echo "下载尝试 $i 失败，重试中..."  # 输出重试信息
-            sleep 10  # 等待10秒后重试
-          done
-          
-          make -j$(nproc) || make -j1 V=s  # 先尝试并行编译，失败则单线程详细编译
+          make -j$(nproc) || make -j$(nproc) V=s  # 并行编译
           ccache -s  # 显示ccache统计信息
         working-directory: ${{ github.workspace }}/immortalwrt-mt798x
 
       # 发布固件
-      - name: Upload artifacts  # 名称：上传构建产物
-        uses: actions/upload-artifact@v4  # 使用GitHub官方的上传产物动作
+      - name: Release Firmware  # 发布构建产物
+        uses: softprops/action-gh-release@master  # 发布工作流
         with:
-          name: H3C-nx30-pro-firmware  # 产物名称
+          name: H3C-nx30-pro  # 产物名称
           path: immortalwrt-mt798x/bin/targets/**/*  # 要上传的文件路径
           retention-days: 7  # 保留天数
