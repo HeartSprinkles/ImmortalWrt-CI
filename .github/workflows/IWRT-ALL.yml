@@ -35,7 +35,7 @@ jobs:
         # 获取源代码
       - name: Clone immortalwrt-mt798x #克隆源码
         run: |
-        git clone --depth=1 --single-branch --branch openwrt-24.10-6.6  https://github.com/padavanonly/immortalwrt-mt798x-24.10.git immortalwrt-mt798x
+          git clone --depth=1 --single-branch --branch openwrt-24.10-6.6  https://github.com/padavanonly/immortalwrt-mt798x-24.10.git immortalwrt-mt798x
 
           
       # 导入设备配置 
