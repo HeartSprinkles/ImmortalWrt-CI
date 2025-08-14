@@ -28,14 +28,12 @@ jobs:
           delete_workflows: true
           workflows_keep_day: 0
   build:
-    runs-on: ubuntu-latest  # 使用GitHub提供的最新Ubuntu镜像
+    runs-on: ubuntu-latest  # 使用Ubuntu镜像
     steps:
 
-      # 检出编译配置仓库
       - name: 检出编译配置仓库
         uses: actions/checkout@main
 
-      # 准备编译环境
       - name: 准备编译环境
         env:
           DEBIAN_FRONTEND: noninteractive  # 设置环境变量避免安装过程中出现交互式提示
@@ -51,7 +49,6 @@ jobs:
           sudo -E systemctl daemon-reload  # 重载系统服务
           sudo -E timedatectl set-timezone "Asia/Shanghai"  # 设置时区
 
-      # 检出编译源码仓库
       - name: 检出编译源码仓库
         uses: actions/checkout@main  # 检出源码工作流
         with:
@@ -59,8 +56,7 @@ jobs:
           ref: 'openwrt-24.10-6.6'  # 目标分支
           path: 'iwrt'  # 编译目录
 
-      # GitHub Ations 移除国内下载源
-      - name: 移除国内下载源  # 移除国内下载源
+      - name: 移除国内下载源
         run: |
 
           PROJECT_MIRRORS_FILE="./scripts/projectsmirrors.json"
@@ -68,7 +64,6 @@ jobs:
             sed -i '/.cn\//d; /tencent/d; /aliyun/d' "$PROJECT_MIRRORS_FILE"
           fi
 
-      # 初始化变量
       - name: 初始化变量
         run: |
           echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV  # 获取提交标签
@@ -76,8 +71,7 @@ jobs:
 
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 配置 ccache 环境
-      - name: 配置缓存环境  # 配置ccache环境
+      - name: 配置缓存环境
         run: |
           echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
           ccache --max-size=2G
@@ -88,8 +82,7 @@ jobs:
           echo "=== Initial ccache stats ==="
           ccache -s
 
-      # 缓存加速
-      - name: 设置缓存加速  # 缓存ccache
+      - name: 设置缓存加速
         id: check-cache
         uses: actions/cache@main  # 缓存工作流
         with:
@@ -100,7 +93,6 @@ jobs:
           key: ${{ runner.os }}-immortalwrt-${{ env.WRT_HASH }}  # 缓存键名
           restore-keys: ${{ runner.os }}-immortalwrt-  # 恢复键名前缀
 
-      # 更新缓存
       - name: 更新缓存
         run: |
           gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
@@ -126,14 +118,12 @@ jobs:
             echo "caches cleanup done!"
           fi
 
-      # 准备构建环境
-      - name: 更新订阅源  # 设置编译环境
+      - name: 更新订阅源
         run: |
           ./scripts/feeds update -a  # 更新所有feeds
           ./scripts/feeds install -a  # 安装所有feeds中的软件包
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 自定义编译设置
       - name: 自定义设置
         run: |
           # 检查.config文件是否存在
@@ -146,25 +136,21 @@ jobs:
           make defconfig -j$(nproc) && make clean -j$(nproc)  # 生成默认配置
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 下载依赖包
-      - name: 下载依赖包  # 下载依赖
+      - name: 下载依赖包
         run: |
           make download -j$(nproc) && break  # 并行下载依赖包
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 编译固件
-      - name: 编译固件 # 编译固件
+      - name: 编译固件
         run: |
           make -j$(nproc) || make -j$(nproc) V=s  # 并行编译
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 显示缓存使用情况
       - name: 显示缓存统计信息
         run: |
           echo "=== Final ccache stats ==="
           ccache -s
 
-      # 打包固件
       - name: 打包固件
         run: |
           cd ./iwrt/ && mkdir ./upload/
@@ -187,8 +173,7 @@ jobs:
 
             make clean -j$(nproc)
 
-      # 发布固件
-      - name: 发布固件  # 发布构建产物
+      - name: 发布固件
         uses: softprops/action-gh-release@v2  # 发布工作流
         with:
           tag_name: ${{github.ref}}
