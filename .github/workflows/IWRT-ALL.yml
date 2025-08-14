@@ -2,16 +2,19 @@ name: immortalwrt-mt798x  # CI计划
 
 on:
   push:
-    branches: [ main, master ]  # 当代码推送到main或master分支时启动工作流
+    tags:
+        - "v*.*.*"  # 当推送以'v'开头的标记时触发工作流
+
   workflow_dispatch:  # 允许手动触发此工作流
+
 jobs:
   build:
     runs-on: ubuntu-latest  # 使用GitHub提供的最新Ubuntu镜像
+
     permissions:
       contents: write  # 需要这个权限来创建release
+
     steps:
-
-
       # 检出编译配置仓库
       - name: Checkout Projects
         uses: actions/checkout@main
@@ -57,22 +60,6 @@ jobs:
 
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 生成日期变量
-      - name: Generate Date Variables  # 获取日期组件
-        id: date
-        run: |
-          RELEASE_YEAR=$(date +"%y")  # 两位年份 (25)
-          RELEASE_MONTH=$(date +"%_m" | xargs)  # 去前导零的月份 (8)
-          RELEASE_DAY=$(date +"%_d" | xargs)  # 去前导零的日期 (13)
-
-          # 构建标签和标题
-          RELEASE_TAG="v$RELEASE_YEAR.$RELEASE_MONTH.$RELEASE_DAY"
-          RELEASE_TITLE="Release $RELEASE_TAG"
-
-          # 注入环境变量
-          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
-          echo "RELEASE_TITLE=$RELEASE_TITLE" >> $GITHUB_ENV
-
       # 配置 ccache 环境
       - name: Set up ccache  # 配置ccache环境
         run: |
@@ -97,7 +84,7 @@ jobs:
           key: ${{ runner.os }}-immortalwrt-${{ env.WRT_HASH }}  # 缓存键名
           restore-keys: ${{ runner.os }}-immortalwrt-  # 恢复键名前缀
 
-      #更新缓存
+      # 更新缓存
       - name: Update Caches
         run: |
           gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
@@ -183,14 +170,13 @@ jobs:
             find ./bin/targets/ -type f -exec mv -f {} ./upload/ \;
 
             make clean -j$(nproc)
-          fi
 
       # 发布固件
       - name: Release Firmware  # 发布构建产物
-        uses: softprops/action-gh-release@master  # 发布工作流
+        uses: softprops/action-gh-release@v2  # 发布工作流
         with:
-          tag_name: ${{ env.RELEASE_TAG }}   # 格式：v25.8.13
-          name: ${{ env.RELEASE_TITLE }}     # 格式：Release v25.8.13
+          tag_name: ${{github.ref}}
+          name: Release ${{github.ref}}
           body: |
             H3C nx30pro 闭源固件
             源码: padavanonly/immortalwrt-mt798x-6.6
