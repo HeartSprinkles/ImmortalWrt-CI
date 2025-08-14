@@ -2,8 +2,8 @@ name: immortalwrt-mt798x  # CI计划
 
 on:
   push:
-#    tags:
-#        - "v*.*.*"  # 当推送以'v'开头的标记时触发工作流
+    tags:
+        - "v*.*.*"  # 当推送以'v'开头的标记时触发工作流
 
   workflow_dispatch:  # 允许手动触发此工作流
 
