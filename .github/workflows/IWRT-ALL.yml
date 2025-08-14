@@ -95,7 +95,6 @@ jobs:
 
       - name: 更新缓存
         run: |
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
           if [ -d "./iwrt/staging_dir" ]; then
             find "./iwrt/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r DIR; do
