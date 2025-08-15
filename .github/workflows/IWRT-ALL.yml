@@ -139,14 +139,16 @@ jobs:
       - name: 创建完整配置文件
         run: |
 
-          if [ -f "./Config/diffconfig" ]; then  # 检查.config文件是否存在
-
-            cp -f ./Config/diffconfig ./iwrt/.config  #创建差异配置文件
-
+          if [ -f "$GITHUB_WORKSPACE/Config/diffconfig" ]; then
+            cat $GITHUB_WORKSPACE/Config/diffconfig >> .config
           else
-            echo "错误:未找到diffconfig"
+            echo "Error: .config file not found in Config directory!"
             exit 1
           fi
+
+          make defconfig -j$(nproc) && make clean -j$(nproc)  # 生成默认配置
+
+        working-directory: ${{ github.workspace }}/iwrt
 
           make defconfig -j$(nproc) && make clean -j$(nproc)  # 扩展为完整配置文件
 
