@@ -90,7 +90,7 @@ jobs:
             ~/.ccache
             ./iwrt/staging_dir/host*
             ./iwrt/staging_dir/tool*
-          key: ${{ runner.os }}-immortalwrt-"$WRT_HASH"  # 缓存键名
+          key: ${{ runner.os }}-immortalwrt-${{ env.WRT_HASH }}  # 缓存键名
           restore-keys: ${{ runner.os }}-immortalwrt-  # 恢复键名前缀
 
       - name: 更新缓存
@@ -155,8 +155,9 @@ jobs:
           mkdir ./upload/
           
           cp -f ./.config ./upload/Config-"openwrt-24.10-6.6"-"$RELEASE_TAG".txt
-
-            WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)
+            #获取内核版本
+            echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
+            
             find ./bin/targets/ -iregex ".*\(buildinfo\|json\|bin\|sha256sums\|packages\|manifest\)$" -exec rm -rf {} +
 
             for FILE in $(find ./bin/targets/ -type f -iname "*$WRT_TARGET*") ; do
@@ -180,8 +181,8 @@ jobs:
             H3C nx30pro 闭源固件
             源码: padavanonly/immortalwrt-mt798x-6.6
             分支: openwrt-24.10-6.6
-            提交: $WRT_HASH
-            内核版本: $WRT_KVER
+            提交: ${{ env.WRT_HASH }}
+            内核版本: ${{ env.WRT_KVER }}
           files: ./iwrt/upload/*.*
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') }}
