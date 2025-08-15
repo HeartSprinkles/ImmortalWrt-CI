@@ -69,7 +69,7 @@ jobs:
         run: |
 
           echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV  # 获取提交标签
-          echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ../Config/.config)" >> $GITHUB_ENV  # 获取目标设备名称
+          echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ../Config/diffconfig)" >> $GITHUB_ENV  # 获取目标设备名称
 
         working-directory: ${{ github.workspace }}/iwrt
 
