@@ -67,7 +67,7 @@ jobs:
       - name: 初始化变量
         run: |
           echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV  # 获取提交标签
-          echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ./Config/.config)" >> $GITHUB_ENV  # 获取目标设备名称
+          echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ../Config/.config)" >> $GITHUB_ENV  # 获取目标设备名称
 
         working-directory: ${{ github.workspace }}/iwrt
 
@@ -152,12 +152,12 @@ jobs:
 
       - name: 打包固件
         run: |
-          cd ./iwrt/ && mkdir ./upload/
-
+          mkdir ./upload/
+          
           cp -f ./.config ./upload/Config-"openwrt-24.10-6.6"-"$RELEASE_TAG".txt
 
             WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)
-            find ./bin/targets/ -iregex ".*\(buildinfo\|json\|sha256sums\|packages\)$" -exec rm -rf {} +
+            find ./bin/targets/ -iregex ".*\(buildinfo\|json\|bin\|sha256sums\|packages\|manifest\)$" -exec rm -rf {} +
 
             for FILE in $(find ./bin/targets/ -type f -iname "*$WRT_TARGET*") ; do
               EXT=$(basename $FILE | cut -d '.' -f 2-)
@@ -169,6 +169,7 @@ jobs:
             find ./bin/targets/ -type f -exec mv -f {} ./upload/ \;
 
             make clean -j$(nproc)
+        working-directory: ${{ github.workspace }}/iwrt
 
       - name: 发布固件
         uses: softprops/action-gh-release@v2  # 发布工作流
