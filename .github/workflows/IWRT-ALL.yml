@@ -141,6 +141,7 @@ jobs:
         working-directory: ${{ github.workspace }}/iwrt
 
       - name: 编译固件
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           make -j$(nproc) || make -j$(nproc) V=s  # 并行编译
         working-directory: ${{ github.workspace }}/iwrt
@@ -157,7 +158,7 @@ jobs:
           cp -f ./.config ./upload/Config-"openwrt-24.10-6.6"-"$RELEASE_TAG".txt
             #获取内核版本
             echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
-            
+
             find ./bin/targets/ -iregex ".*\(buildinfo\|json\|bin\|sha256sums\|packages\|manifest\)$" -exec rm -rf {} +
 
             for FILE in $(find ./bin/targets/ -type f -iname "*$WRT_TARGET*") ; do
@@ -175,8 +176,8 @@ jobs:
       - name: 发布固件
         uses: softprops/action-gh-release@v2  # 发布工作流
         with:
-          tag_name: ${{github.ref }}
-          name: Release ${{github.ref }}
+          tag_name: ${{github.ref_name }}
+          name: Release ${{github.ref_name }}
           body: |
             H3C nx30pro 闭源固件
             源码: padavanonly/immortalwrt-mt798x-6.6
