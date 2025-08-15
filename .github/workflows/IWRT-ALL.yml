@@ -117,6 +117,11 @@ jobs:
             echo "caches cleanup done!"
           fi
 
+      - name: 添加软件源
+        run: |
+          echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >> "feeds.conf.default"
+        working-directory: ${{ github.workspace }}/iwrt
+
       - name: 更新订阅源
         run: |
           ./scripts/feeds update -a  # 更新所有feeds
