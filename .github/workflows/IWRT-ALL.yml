@@ -38,6 +38,7 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive  # 设置环境变量避免安装过程中出现交互式提示
         run: |
+
           sudo -E apt -yqq purge firefox  # 卸载 Firefox
           sudo -E apt -yqq update  # 更新软件包列表
           sudo -E apt -yqq full-upgrade  # 全面升级系统
@@ -66,6 +67,7 @@ jobs:
 
       - name: 初始化变量
         run: |
+
           echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV  # 获取提交标签
           echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ../Config/.config)" >> $GITHUB_ENV  # 获取目标设备名称
 
@@ -73,6 +75,7 @@ jobs:
 
       - name: 配置缓存环境
         run: |
+
           echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
           ccache --max-size=2G
           ccache -z  # 重置统计信息
@@ -87,6 +90,7 @@ jobs:
         uses: actions/cache@main  # 缓存工作流
         with:
           path: |
+
             ~/.ccache
             ./iwrt/staging_dir/host*
             ./iwrt/staging_dir/tool*
@@ -103,9 +107,9 @@ jobs:
 
             mkdir -p ./iwrt/tmp && echo "1" > ./iwrt/tmp/.build
 
-            echo "toolchain skiped done!"
+            echo "工具链跳过完成!"
           else
-            echo "caches missed!"
+            echo "缓存未命中!"
           fi
 
           if ${{steps.check-cache.outputs.cache-hit != 'true' }}; then
@@ -114,18 +118,22 @@ jobs:
               gh cache delete $CACHE_KEY
             done
 
-            echo "caches cleanup done!"
+            echo "缓存清理完成!"
           fi
 
       - name: 添加软件源
         run: |
+
           echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >> "feeds.conf.default"
+
         working-directory: ${{ github.workspace }}/iwrt
 
       - name: 更新订阅源
         run: |
+
           ./scripts/feeds update -a  # 更新所有feeds
           ./scripts/feeds install -a  # 安装所有feeds中的软件包
+
         working-directory: ${{ github.workspace }}/iwrt
 
       - name: 检入差异配置文件
@@ -146,40 +154,46 @@ jobs:
         run: |
 
           make download -j$(nproc) && break  # 并行下载依赖包
-          
+
         working-directory: ${{ github.workspace }}/iwrt
 
       - name: 编译固件
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
+
           make -j$(nproc) || make -j$(nproc) V=s  # 并行编译
+
         working-directory: ${{ github.workspace }}/iwrt
 
       - name: 显示缓存统计信息
         run: |
+
           echo "=== Final ccache stats ==="
           ccache -s
 
       - name: 打包固件
         run: |
-          mkdir ./upload/
-          
-          cp -f ./.config ./upload/Config-"openwrt-24.10-6.6"-"$RELEASE_TAG".txt
-            #获取内核版本
-            echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
 
+          mkdir ./upload/
+
+          cp -f ./.config ./upload/Config-"openwrt-24.10-6.6"-"$RELEASE_TAG".txt
+
+            echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
             find ./bin/targets/ -iregex ".*\(buildinfo\|json\|bin\|sha256sums\|packages\|manifest\)$" -exec rm -rf {} +
 
             for FILE in $(find ./bin/targets/ -type f -iname "*$WRT_TARGET*") ; do
+
               EXT=$(basename $FILE | cut -d '.' -f 2-)
               NAME=$(basename $FILE | cut -d '.' -f 1 | grep -io "\($WRT_TARGET\).*")
               NEW_FILE="openwrt-24.10-6.6"-"$NAME"-"$RELEASE_TAG"."$EXT"
               mv -f $FILE ./upload/$NEW_FILE
+
             done
 
             find ./bin/targets/ -type f -exec mv -f {} ./upload/ \;
 
             make clean -j$(nproc)
+
         working-directory: ${{ github.workspace }}/iwrt
 
       - name: 发布固件
@@ -194,5 +208,3 @@ jobs:
             提交: ${{ env.WRT_HASH }}
             内核版本: ${{ env.WRT_KVER }}
           files: ./iwrt/upload/*.*
-          draft: false
-          prerelease: ${{ contains(github.ref_name, 'beta') }}
