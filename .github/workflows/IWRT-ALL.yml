@@ -8,7 +8,7 @@ on:
   workflow_dispatch:  # 允许手动触发此工作流
 
 env:
-  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN }}
 
 #CI权限
 permissions: write-all 
@@ -18,25 +18,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - name: Delete old Releases and Workflows
+      - name: 删除旧的版本和工作流
         uses: ophub/delete-releases-workflows@main
         with:
-          gh_token: ${{secrets.GITHUB_TOKEN}}
+          gh_token: ${{secrets.GITHUB_TOKEN }}
           delete_releases: true
-          releases_keep_latest: 0
+          releases_keep_latest: 2
           delete_tags: true
           delete_workflows: true
-          workflows_keep_day: 0
+          workflows_keep_day: 3
   build:
-    runs-on: ubuntu-latest  # 使用GitHub提供的最新Ubuntu镜像
+    runs-on: ubuntu-latest  # 使用Ubuntu镜像
     steps:
 
-      # 检出编译配置仓库
-      - name: Checkout Projects
+      - name: 检出编译配置仓库
         uses: actions/checkout@main
 
-      # 准备编译环境
-      - name: Initialization Environment
+      - name: 准备编译环境
         env:
           DEBIAN_FRONTEND: noninteractive  # 设置环境变量避免安装过程中出现交互式提示
         run: |
@@ -51,16 +49,14 @@ jobs:
           sudo -E systemctl daemon-reload  # 重载系统服务
           sudo -E timedatectl set-timezone "Asia/Shanghai"  # 设置时区
 
-      # 检出编译源码仓库
-      - name: Checkout Third-Party Code  # 检出编译源码
-        uses: actions/checkout@main
+      - name: 检出编译源码仓库
+        uses: actions/checkout@main  # 检出源码工作流
         with:
           repository: 'padavanonly/immortalwrt-mt798x-6.6'  # 目标仓库
           ref: 'openwrt-24.10-6.6'  # 目标分支
           path: 'iwrt'  # 编译目录
 
-      # GitHub Ations 移除国内下载源
-      - name: Remove domestic download sources  # 移除国内下载源
+      - name: 移除国内下载源
         run: |
 
           PROJECT_MIRRORS_FILE="./scripts/projectsmirrors.json"
@@ -68,16 +64,14 @@ jobs:
             sed -i '/.cn\//d; /tencent/d; /aliyun/d' "$PROJECT_MIRRORS_FILE"
           fi
 
-      # 初始化变量
-      - name: Initialization Values
+      - name: 初始化变量
         run: |
           echo "WRT_HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV  # 获取提交标签
-          echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ./Config/.config)" >> $GITHUB_ENV  # 获取目标设备名称
+          echo "WRT_TARGET=$(grep -m 1 -oP '^CONFIG_TARGET_\K[\w]+(?=\=y)' ../Config/.config)" >> $GITHUB_ENV  # 获取目标设备名称
 
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 配置 ccache 环境
-      - name: Set up ccache  # 配置ccache环境
+      - name: 配置缓存环境
         run: |
           echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
           ccache --max-size=2G
@@ -88,10 +82,9 @@ jobs:
           echo "=== Initial ccache stats ==="
           ccache -s
 
-      # 缓存加速
-      - name: Check Caches  # 缓存ccache
+      - name: 设置缓存加速
         id: check-cache
-        uses: actions/cache@main  # 使用GitHub官方的缓存动作
+        uses: actions/cache@main  # 缓存工作流
         with:
           path: |
             ~/.ccache
@@ -100,10 +93,8 @@ jobs:
           key: ${{ runner.os }}-immortalwrt-${{ env.WRT_HASH }}  # 缓存键名
           restore-keys: ${{ runner.os }}-immortalwrt-  # 恢复键名前缀
 
-      # 更新缓存
-      - name: Update Caches
+      - name: 更新缓存
         run: |
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
           if [ -d "./iwrt/staging_dir" ]; then
             find "./iwrt/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r DIR; do
@@ -117,7 +108,7 @@ jobs:
             echo "caches missed!"
           fi
 
-          if ${{steps.check-cache.outputs.cache-hit != 'true'}}; then
+          if ${{steps.check-cache.outputs.cache-hit != 'true' }}; then
             CACHE_LIST=$(gh cache list --key "${{ runner.os }}-immortalwrt-" | cut -f 1)
             for CACHE_KEY in $CACHE_LIST; do
               gh cache delete $CACHE_KEY
@@ -126,19 +117,17 @@ jobs:
             echo "caches cleanup done!"
           fi
 
-      # 准备构建环境
-      - name: Update Feeds  # 设置编译环境
+      - name: 更新订阅源
         run: |
           ./scripts/feeds update -a  # 更新所有feeds
           ./scripts/feeds install -a  # 安装所有feeds中的软件包
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 导入并生成设备Config
-      - name: Custom Settings 
+      - name: 自定义设置
         run: |
-          # 检查.config文件是否存在复制.config
+          # 检查.config文件是否存在
           if [ -f "$GITHUB_WORKSPACE/Config/.config" ]; then
-            cat $GITHUB_WORKSPACE/Config/.config >> .config
+            cat $GITHUB_WORKSPACE/Config/.config >> .config  #复制.config
           else
             echo "Error: .config file not found in Config directory!"
             exit 1
@@ -146,35 +135,31 @@ jobs:
           make defconfig -j$(nproc) && make clean -j$(nproc)  # 生成默认配置
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 下载依赖包
-      - name: Download Packages  # 下载依赖
+      - name: 下载依赖包
         run: |
           make download -j$(nproc) && break  # 并行下载依赖包
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 编译固件
-      - name: Compile firmware  # 编译固件
+      - name: 编译固件
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           make -j$(nproc) || make -j$(nproc) V=s  # 并行编译
         working-directory: ${{ github.workspace }}/iwrt
 
-      # 显示缓存使用情况
-      - name: Show ccache stats
+      - name: 显示缓存统计信息
         run: |
           echo "=== Final ccache stats ==="
           ccache -s
 
-      # 整理生成产物预备发布
-      - name: Package Firmware
+      - name: 打包固件
         run: |
-          cd ./iwrt/ && mkdir ./upload/
-
+          mkdir ./upload/
+          
           cp -f ./.config ./upload/Config-"openwrt-24.10-6.6"-"$RELEASE_TAG".txt
-
+            #获取内核版本
             echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
-            echo "WRT_LIST=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^luci-(app|theme)[^ ]*' {} \; | tr '\n' ' ')" >> $GITHUB_ENV
 
-            find ./bin/targets/ -iregex ".*\(buildinfo\|json\|sha256sums\|packages\)$" -exec rm -rf {} +
+            find ./bin/targets/ -iregex ".*\(buildinfo\|json\|bin\|sha256sums\|packages\|manifest\)$" -exec rm -rf {} +
 
             for FILE in $(find ./bin/targets/ -type f -iname "*$WRT_TARGET*") ; do
               EXT=$(basename $FILE | cut -d '.' -f 2-)
@@ -186,19 +171,19 @@ jobs:
             find ./bin/targets/ -type f -exec mv -f {} ./upload/ \;
 
             make clean -j$(nproc)
+        working-directory: ${{ github.workspace }}/iwrt
 
-      # 发布固件
-      - name: Release Firmware  # 发布构建产物
+      - name: 发布固件
         uses: softprops/action-gh-release@v2  # 发布工作流
         with:
-          tag_name: ${{github.ref}}
-          name: Release ${{github.ref}}
+          tag_name: ${{github.ref_name }}
+          name: Release ${{github.ref_name }}
           body: |
             H3C nx30pro 闭源固件
             源码: padavanonly/immortalwrt-mt798x-6.6
             分支: openwrt-24.10-6.6
-            提交: ${{env.WRT_HASH}}
-            内核版本: ${{env.WRT_KVER}}
+            提交: ${{ env.WRT_HASH }}
+            内核版本: ${{ env.WRT_KVER }}
           files: ./iwrt/upload/*.*
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') }}
