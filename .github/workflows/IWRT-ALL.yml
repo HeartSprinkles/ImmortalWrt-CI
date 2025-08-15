@@ -141,7 +141,7 @@ jobs:
 
           if [ -f "./Config/diffconfig" ]; then  # 检查.config文件是否存在
 
-            cat ./Config/diffconfig >> ./iwrt/.config  #复制.config
+            cat ./Config/diffconfig > ./iwrt/.config  #复制.config
 
           else
             echo "错误:未找到diffconfig"
