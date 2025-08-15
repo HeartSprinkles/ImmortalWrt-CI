@@ -128,7 +128,7 @@ jobs:
 
         working-directory: ${{ github.workspace }}/iwrt
 
-      - name: 更新订阅源
+      - name: 更新软件源
         run: |
 
           ./scripts/feeds update -a  # 更新所有feeds
@@ -136,12 +136,12 @@ jobs:
 
         working-directory: ${{ github.workspace }}/iwrt
 
-      - name: 检入差异配置文件
+      - name: 创建完整配置文件
         run: |
 
           if [ -f "./Config/diffconfig" ]; then  # 检查.config文件是否存在
 
-            cat ./Config/diffconfig > ./iwrt/.config  #复制.config
+            cp -f ./Config/diffconfig ./iwrt/.config  #创建差异配置文件
 
           else
             echo "错误:未找到diffconfig"
