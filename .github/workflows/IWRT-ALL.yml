@@ -8,7 +8,7 @@ on:
   workflow_dispatch:  # 允许手动触发此工作流
 
 env:
-  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN }}
 
 #CI权限
 permissions: write-all 
@@ -21,7 +21,7 @@ jobs:
       - name: 删除旧的版本和工作流
         uses: ophub/delete-releases-workflows@main
         with:
-          gh_token: ${{secrets.GITHUB_TOKEN}}
+          gh_token: ${{secrets.GITHUB_TOKEN }}
           delete_releases: true
           releases_keep_latest: 0
           delete_tags: true
@@ -90,7 +90,7 @@ jobs:
             ~/.ccache
             ./iwrt/staging_dir/host*
             ./iwrt/staging_dir/tool*
-          key: ${{ runner.os }}-immortalwrt-${{ env.WRT_HASH }}  # 缓存键名
+          key: ${{ runner.os }}-immortalwrt-"$WRT_HASH"  # 缓存键名
           restore-keys: ${{ runner.os }}-immortalwrt-  # 恢复键名前缀
 
       - name: 更新缓存
@@ -108,7 +108,7 @@ jobs:
             echo "caches missed!"
           fi
 
-          if ${{steps.check-cache.outputs.cache-hit != 'true'}}; then
+          if ${{steps.check-cache.outputs.cache-hit != 'true' }}; then
             CACHE_LIST=$(gh cache list --key "${{ runner.os }}-immortalwrt-" | cut -f 1)
             for CACHE_KEY in $CACHE_LIST; do
               gh cache delete $CACHE_KEY
@@ -156,9 +156,7 @@ jobs:
 
           cp -f ./.config ./upload/Config-"openwrt-24.10-6.6"-"$RELEASE_TAG".txt
 
-            echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
-            echo "WRT_LIST=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^luci-(app|theme)[^ ]*' {} \; | tr '\n' ' ')" >> $GITHUB_ENV
-
+            WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)
             find ./bin/targets/ -iregex ".*\(buildinfo\|json\|sha256sums\|packages\)$" -exec rm -rf {} +
 
             for FILE in $(find ./bin/targets/ -type f -iname "*$WRT_TARGET*") ; do
@@ -175,14 +173,14 @@ jobs:
       - name: 发布固件
         uses: softprops/action-gh-release@v2  # 发布工作流
         with:
-          tag_name: ${{github.ref}}
-          name: Release ${{github.ref}}
+          tag_name: ${{github.ref }}
+          name: Release ${{github.ref }}
           body: |
             H3C nx30pro 闭源固件
             源码: padavanonly/immortalwrt-mt798x-6.6
             分支: openwrt-24.10-6.6
-            提交: ${{env.WRT_HASH}}
-            内核版本: ${{env.WRT_KVER}}
+            提交: $WRT_HASH
+            内核版本: $WRT_KVER
           files: ./iwrt/upload/*.*
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') }}
